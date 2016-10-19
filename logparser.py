@@ -1,10 +1,16 @@
 #!/usr/bin/python
 """
-    Tails lines from a log file (an Apache2 logfile with wanted format).
-    Checks if the log file contains a decoytoken from another file.
+    Tails lines from a log file A.
+    Checks if the log file A contains a string (= any line from file B).
     If yes, writes an alert to syslog. 
 
-    Test it out:
+	Input: 	path of file A to parse, path of file B that contains strings
+	        to parse from file A, parsing format (string), and 
+	        min time to wait between rounds in seconds (int):
+
+	Output:	wanted lines to syslog
+
+    To test it out:
 
 import logparser
 accesslog = "/var/log/apache2/access.log"
@@ -26,9 +32,16 @@ except:
      * https://docs.python.org/2/library/syslog.html
      * https://github.com/bgreenlee/pygtail
      * https://github.com/rory/apache-log-parser
-    TODO:
-     * https://stackoverflow.com/questions/3389574/check-if-multiple-strings-exist-in-another-string
 
+    TO THINK ABOUT:
+     * https://stackoverflow.com/questions/3389574/check-if-multiple-strings-exist-in-another-string
+     * https://en.wikipedia.org/wiki/Hash_table
+     * Regular expression patterns (as lines in file B)
+     
+    Note: If you need more advanced and well tested tool and there is no
+    need to use Python, see SEC https://simple-evcorr.github.io/ instead.
+    
+     
 """
 
 from pygtail import Pygtail
@@ -66,9 +79,19 @@ class Logparser:
 			print e
 			exit()
 
+	def log_string_discovery_info(self, token, log_line_data, line):
+		'Logging the stuff... Modify these as you want.'
+		syslog.syslog(syslog.LOG_INFO, "String '" + token.strip() + "' was found from line " + line.strip())
+
+
+	def log_decoytoken_alert(self, token, log_line_data, line):
+		'Logging an access to decoytoken URL... Modify these as you want.'
+		syslog.syslog(syslog.LOG_ALERT, "Decoytoken '" + token.strip() + "' accessed from " + log_line_data['remote_host'] + " at " + log_line_data['time_received'] + ":")
+		syslog.syslog(syslog.LOG_ALERT, line.strip())
+
 
 	def parse(self):
-		'Parsing the stuff'
+		'Parsing the stuff...'
 		start = time.clock()
 		try:
 			for line in Pygtail(self.accesslog):
@@ -78,8 +101,7 @@ class Logparser:
 					for token in f:
 						if token.strip() in log_line_data['request_url']:
 							#pprint(log_line_data)
-							syslog.syslog(syslog.LOG_ALERT, "Decoytoken '" + token.strip() + "' accessed from " + log_line_data['remote_host'] + " at " + log_line_data['time_received'] + ":")
-							syslog.syslog(syslog.LOG_ALERT, line.strip())	
+							log_decoytoken_alert(token, log_line_data, line)
 		except ValueError as v:
 			print v
 		except IOError as e:
@@ -91,7 +113,7 @@ class Logparser:
 		
 		
 	def start_parser(self, checks):
-		'Starting the parser'
+		'Starting the parser...'
 		if checks <= 0:
 			while True:
 				self.parse()
